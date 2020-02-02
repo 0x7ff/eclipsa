@@ -17,6 +17,40 @@
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
 #	define PATCH_VAL_4 (0xD503201F) /* nop */
+#elif CPID == 0x7001
+#	define SYNOPSYS_ROUTINE_ADDR (0x1000064FC)
+#	define ARCH_TASK_TRAMP_ADDR (0x100010988)
+#	define IO_BUFFER_ADDR (0x18010D300)
+#	define SRTG "iBoot-1991.0.0.2.16"
+#	define PATCH_ADDR_0 (0x10000A714)
+#	define PATCH_ADDR_1 (0x10000A71C)
+#	define PATCH_ADDR_2 (0x10000A720)
+#	define PATCH_ADDR_3 (0x10000A744)
+#	define PATCH_ADDR_4 (0x10000AA08)
+#	define PATCH_VAL_0 (0xD503201F) /* nop */
+#	define PATCH_VAL_1 (0x52800029) /* mov w9, #1 */
+#	define PATCH_VAL_2 (0xD503201F) /* nop */
+#	define PATCH_VAL_3 (0xD503201F) /* nop */
+#	define PATCH_VAL_4 (0xD503201F) /* nop */
+#elif CPID == 0x8000 || CPID == 0x8003
+#	define SYNOPSYS_ROUTINE_ADDR (0x100006718)
+#	define ARCH_TASK_TRAMP_ADDR (0x10000D998)
+#	define IO_BUFFER_ADDR (0x18010D500)
+#	if CPID == 0x8000
+#		define SRTG "iBoot-2234.0.0.3.3"
+#	elif CPID == 0x8003
+#		define SRTG "iBoot-2234.0.0.2.22"
+#	endif
+#	define PATCH_ADDR_0 (0x100007924)
+#	define PATCH_ADDR_1 (0x100007934)
+#	define PATCH_ADDR_2 (0x10000792C)
+#	define PATCH_ADDR_3 (0x100007958)
+#	define PATCH_ADDR_4 (0x100007C9C)
+#	define PATCH_VAL_0 (0xD503201F) /* nop */
+#	define PATCH_VAL_1 (0x52800038) /* mov w24, #1 */
+#	define PATCH_VAL_2 (0xD503201F) /* nop */
+#	define PATCH_VAL_3 (0xD503201F) /* nop */
+#	define PATCH_VAL_4 (0xD503201F) /* nop */
 #endif
 
 #define MAGIC (0xB4)
