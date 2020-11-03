@@ -160,7 +160,7 @@ typedef struct {
 typedef struct {
 	stage_t stage;
 	UInt16 vid, pid;
-	IOUSBDeviceInterface **device;
+	IOUSBDeviceInterface650 **device;
 	CFRunLoopSourceRef async_event_source;
 } handle_t;
 
@@ -216,7 +216,7 @@ close_usb_device(const handle_t *handle) {
 
 static kern_return_t
 open_usb_device(io_service_t serv, handle_t *handle) {
-	if(query_usb_interface(serv, kIOUSBDeviceUserClientTypeID, kIOUSBDeviceInterfaceID, (LPVOID *)&handle->device) == KERN_SUCCESS) {
+	if(query_usb_interface(serv, kIOUSBDeviceUserClientTypeID, kIOUSBDeviceInterfaceID650, (LPVOID *)&handle->device) == KERN_SUCCESS) {
 		if((*handle->device)->USBDeviceOpen(handle->device) == KERN_SUCCESS) {
 			if((*handle->device)->SetConfiguration(handle->device, 1) == KERN_SUCCESS && (*handle->device)->CreateDeviceAsyncEventSource(handle->device, &handle->async_event_source) == KERN_SUCCESS) {
 				CFRunLoopAddSource(CFRunLoopGetCurrent(), handle->async_event_source, kCFRunLoopDefaultMode);
