@@ -443,6 +443,7 @@ attached_usb_handle(void *refcon, io_iterator_t iter) {
 				close_usb_device(handle);
 				if(handle->stage == STAGE_END) {
 					CFRunLoopStop(CFRunLoopGetCurrent());
+					break;
 				}
 			}
 		} else {
