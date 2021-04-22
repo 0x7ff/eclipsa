@@ -282,11 +282,14 @@ checkm8_stage_reset(const handle_t *handle) {
 static kern_return_t
 checkm8_stage_setup(const handle_t *handle) {
 	dfu_overwrite_t overwrite;
+	struct timespec req;
 	transfer_t transfer;
 
+	req.tv_sec = 0;
+	req.tv_nsec = 64;
 	memset(&overwrite, MAGIC, sizeof(overwrite));
 	do {
-		if(send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, &overwrite, sizeof(overwrite), &transfer) != KERN_SUCCESS || (*handle->device)->USBDeviceAbortPipeZero(handle->device) != KERN_SUCCESS) {
+		if(send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, &overwrite, sizeof(overwrite), &transfer) != KERN_SUCCESS || nanosleep(&req, NULL) != 0 || (*handle->device)->USBDeviceAbortPipeZero(handle->device) != KERN_SUCCESS) {
 			break;
 		}
 		CFRunLoopRun();
@@ -405,6 +408,7 @@ attached_usb_handle(void *refcon, io_iterator_t iter) {
 					printf("Stage: ABORT");
 				}
 				printf(", ret: 0x%" PRIX32 "\n", ret);
+				usleep(100);
 				if(((*handle->device)->USBDeviceReEnumerate(handle->device, 0) != KERN_SUCCESS || ret != KERN_SUCCESS) && handle->stage != STAGE_ABORT) {
 					handle->stage = STAGE_RESET;
 				}
